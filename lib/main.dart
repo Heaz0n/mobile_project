@@ -75,18 +75,18 @@ class QuizRepository {
     final box = await Hive.openBox('quizBox');
     final cacheKey = '${category}_${difficulty}_$amount';
     
-if (box.containsKey(cacheKey)) {
-  final cachedData = box.get(cacheKey);
-  final now = DateTime.now();
-  final cachedTime = box.get('${cacheKey}_time');
-  if (cachedTime != null && now.difference(cachedTime as DateTime).inDays < 1) {
-    final List<dynamic> dataList = cachedData is List ? cachedData : [];
-    return dataList.map((item) {
-      final Map<String, dynamic> itemMap = item is Map ? Map<String, dynamic>.from(item) : {};
-      return QuizQuestion.fromMap(itemMap);
-    }).toList();
-  }
-}
+    if (box.containsKey(cacheKey)) {
+      final cachedData = box.get(cacheKey);
+      final now = DateTime.now();
+      final cachedTime = box.get('${cacheKey}_time');
+      if (cachedTime != null && now.difference(cachedTime as DateTime).inDays < 1) {
+        final List<dynamic> dataList = cachedData is List ? cachedData : [];
+        return dataList.map((item) {
+          final Map<String, dynamic> itemMap = item is Map ? Map<String, dynamic>.from(item) : {};
+          return QuizQuestion.fromMap(itemMap);
+        }).toList();
+      }
+    }
 
     int? categoryId = categories[category];
     String url = 'https://opentdb.com/api.php?amount=$amount&type=multiple';
@@ -356,36 +356,36 @@ class QuizQuestion {
     );
   }
 
-Future<void> translate(String targetLang) async {
-  try {
-    // Перевод вопроса
-    final questionResponse = await http.get(
-      Uri.parse('https://api.mymemory.translated.net/get?q=${Uri.encodeComponent(question)}&langpair=en|$targetLang'),
-    );
-    if (questionResponse.statusCode == 200) {
-      final questionData = json.decode(questionResponse.body) as Map<String, dynamic>;
-      translatedQuestion = questionData['responseData']['translatedText'] as String? ?? question;
-    }
-
-    // Перевод вариантов ответов
-    translatedOptions = [];
-    for (var option in options) {
-      final optionResponse = await http.get(
-        Uri.parse('https://api.mymemory.translated.net/get?q=${Uri.encodeComponent(option)}&langpair=en|$targetLang'),
+  Future<void> translate(String targetLang) async {
+    try {
+      // Перевод вопроса
+      final questionResponse = await http.get(
+        Uri.parse('https://api.mymemory.translated.net/get?q=${Uri.encodeComponent(question)}&langpair=en|$targetLang'),
       );
-      if (optionResponse.statusCode == 200) {
-        final optionData = json.decode(optionResponse.body) as Map<String, dynamic>;
-        translatedOptions.add(optionData['responseData']['translatedText'] as String? ?? option);
-      } else {
-        translatedOptions.add(option);
+      if (questionResponse.statusCode == 200) {
+        final questionData = json.decode(questionResponse.body) as Map<String, dynamic>;
+        translatedQuestion = questionData['responseData']['translatedText'] as String? ?? question;
       }
+
+      // Перевод вариантов ответов
+      translatedOptions = [];
+      for (var option in options) {
+        final optionResponse = await http.get(
+          Uri.parse('https://api.mymemory.translated.net/get?q=${Uri.encodeComponent(option)}&langpair=en|$targetLang'),
+        );
+        if (optionResponse.statusCode == 200) {
+          final optionData = json.decode(optionResponse.body) as Map<String, dynamic>;
+          translatedOptions.add(optionData['responseData']['translatedText'] as String? ?? option);
+        } else {
+          translatedOptions.add(option);
+        }
+      }
+    } catch (e) {
+      debugPrint('Translation error: $e');
+      translatedQuestion = question;
+      translatedOptions = options;
     }
-  } catch (e) {
-    debugPrint('Translation error: $e');
-    translatedQuestion = question;
-    translatedOptions = options;
   }
-}
 
   Future<void> fetchWikipediaInfo() async {
     try {
@@ -418,21 +418,23 @@ Future<void> translate(String targetLang) async {
       debugPrint('Wikipedia error: $e');
     }
   }
-Future<void> fetchImage() async {
-  try {
-    final response = await http.get(
-      Uri.parse('https://pixabay.com/api/?key=YOUR_PIXABAY_API_KEY&q=${Uri.encodeComponent(category)}&image_type=photo&per_page=3'),
-    );
-    if (response.statusCode == 200) {
-      final data = json.decode(response.body) as Map<String, dynamic>;
-      if (data['hits'] != null && (data['hits'] as List).isNotEmpty) {
-        imageUrl = (data['hits'] as List<dynamic>)[0]['webformatURL'] as String?;
+
+  Future<void> fetchImage() async {
+    try {
+      final response = await http.get(
+        Uri.parse('https://pixabay.com/api/?key=YOUR_PIXABAY_API_KEY&q=${Uri.encodeComponent(category)}&image_type=photo&per_page=3'),
+      );
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body) as Map<String, dynamic>;
+        if (data['hits'] != null && (data['hits'] as List).isNotEmpty) {
+          imageUrl = (data['hits'] as List<dynamic>)[0]['webformatURL'] as String?;
+        }
       }
+    } catch (e) {
+      debugPrint('Image fetch error: $e');
     }
-  } catch (e) {
-    debugPrint('Image fetch error: $e');
   }
-}
+
   Future<void> generateHints() async {
     hints = [];
     final correctAnswer = options[correctIndex];
@@ -1209,16 +1211,31 @@ class _QuizScreenState extends State<QuizScreen> with SingleTickerProviderStateM
                         if (isAnswered && showExplanation && question.explanation != null)
                           _buildExplanationCard(question.explanation!),
                         if (isAnswered)
-                          TextButton(
-                            onPressed: () {
-                              setState(() => showExplanation = !showExplanation);
-                            },
-                            child: Text(
-                              showExplanation ? 'Скрыть объяснение' : 'Показать объяснение',
-                              style: TextStyle(
-                                color: Theme.of(context).colorScheme.primary,
+                          Column(
+                            children: [
+                              TextButton(
+                                onPressed: () {
+                                  setState(() => showExplanation = !showExplanation);
+                                },
+                                child: Text(
+                                  showExplanation ? 'Скрыть объяснение' : 'Показать объяснение',
+                                  style: TextStyle(
+                                    color: Theme.of(context).colorScheme.primary,
+                                  ),
+                                ),
                               ),
-                            ),
+                              // Добавленная кнопка Wikipedia
+                              if (question.wikipediaUrl != null && question.wikipediaUrl!.isNotEmpty)
+                                ElevatedButton.icon(
+                                  onPressed: _openWikipedia,
+                                  icon: const Icon(Icons.public),
+                                  label: const Text('Открыть в Wikipedia'),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.blue,
+                                    foregroundColor: Colors.white,
+                                  ),
+                                ),
+                            ],
                           ),
                       ],
                     ),
@@ -1301,33 +1318,32 @@ class _QuizScreenState extends State<QuizScreen> with SingleTickerProviderStateM
     );
   }
 
-  // В классе _QuizScreenState добавил отображение подсказок и картинок
-Widget _buildQuestionImage(String imageUrl) {
-  return Container(
-    height: 180,
-    margin: const EdgeInsets.only(bottom: 16),
-    decoration: BoxDecoration(
-      borderRadius: BorderRadius.circular(12),
-      boxShadow: [
-        BoxShadow(
-          color: Colors.black.withOpacity(0.1),
-          blurRadius: 8,
-          offset: const Offset(0, 4),
-        ),
-      ],
-    ),
-    child: ClipRRect(
-      borderRadius: BorderRadius.circular(12),
-      child: CachedNetworkImage(
-        imageUrl: imageUrl,
-        fit: BoxFit.cover,
-        width: double.infinity,
-        placeholder: (context, url) => const Center(child: CircularProgressIndicator()),
-        errorWidget: (context, url, error) => const Icon(Icons.error),
+  Widget _buildQuestionImage(String imageUrl) {
+    return Container(
+      height: 180,
+      margin: const EdgeInsets.only(bottom: 16),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.1),
+            blurRadius: 8,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
-    ),
-  );
-}
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(12),
+        child: CachedNetworkImage(
+          imageUrl: imageUrl,
+          fit: BoxFit.cover,
+          width: double.infinity,
+          placeholder: (context, url) => const Center(child: CircularProgressIndicator()),
+          errorWidget: (context, url, error) => const Icon(Icons.error),
+        ),
+      ),
+    );
+  }
 
   Widget _buildExplanationCard(String explanation) {
     return Card(
@@ -1365,36 +1381,34 @@ Widget _buildQuestionImage(String imageUrl) {
   }
 
   Widget _buildHintsCard(List<String> hints) {
-  return Card(
-    color: Theme.of(context).colorScheme.secondaryContainer,
-    margin: const EdgeInsets.only(bottom: 16),
-    shape: RoundedRectangleBorder(
-      borderRadius: BorderRadius.circular(12),
-    ),
-    child: Padding(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Подсказки:',
-            style: TextStyle(
-              fontWeight: FontWeight.bold,
-              fontSize: 16,
-            ),
-          ),
-          const SizedBox(height: 8),
-          ...hints.map((hint) => Padding(
-            padding: const EdgeInsets.only(bottom: 4),
-            child: Text('• $hint'),
-          )),
-        ],
+    return Card(
+      color: Theme.of(context).colorScheme.secondaryContainer,
+      margin: const EdgeInsets.only(bottom: 16),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
       ),
-    ),
-  );
-  
-}
-
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Подсказки:',
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 16,
+              ),
+            ),
+            const SizedBox(height: 8),
+            ...hints.map((hint) => Padding(
+              padding: const EdgeInsets.only(bottom: 4),
+              child: Text('• $hint'),
+            )),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 class ResultsScreen extends StatefulWidget {
@@ -1451,199 +1465,198 @@ class _ResultsScreenState extends State<ResultsScreen> {
     }
   }
 
-@override
-Widget build(BuildContext context) {
-  final percentage = (widget.score / (widget.totalQuestions * 10)) * 100;
-  String resultText;
-  String imageAsset; // Заменяем JSON на путь к JPG
-  Color resultColor;
+  @override
+  Widget build(BuildContext context) {
+    final percentage = (widget.score / (widget.totalQuestions * 10)) * 100;
+    String resultText;
+    String imageAsset;
+    Color resultColor;
 
-  if (percentage >= 80) {
-    resultText = 'Превосходно! 🎉';
-    imageAsset = 'assets/images/success.jpg'; // Укажите путь к JPG
-    resultColor = Colors.green;
-  } else if (percentage >= 50) {
-    resultText = 'Хороший результат! 👍';
-    imageAsset = 'assets/images/good.jpg'; // Укажите путь к JPG
-    resultColor = Colors.orange;
-  } else {
-    resultText = 'Попробуйте ещё раз! 💪';
-    imageAsset = 'assets/images/try_again.jpg'; // Укажите путь к JPG
-    resultColor = Colors.red;
-  }
+    if (percentage >= 80) {
+      resultText = 'Превосходно! 🎉';
+      imageAsset = 'assets/images/success.jpg';
+      resultColor = Colors.green;
+    } else if (percentage >= 50) {
+      resultText = 'Хороший результат! 👍';
+      imageAsset = 'assets/images/good.jpg';
+      resultColor = Colors.orange;
+    } else {
+      resultText = 'Попробуйте ещё раз! 💪';
+      imageAsset = 'assets/images/try_again.jpg';
+      resultColor = Colors.red;
+    }
 
-  return Scaffold(
-    body: Stack(
-      children: [
-        SafeArea(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                // Заменяем Lottie.asset на Image.asset
-                Image.asset(
-                  imageAsset,
-                  width: 200,
-                  height: 200,
-                  fit: BoxFit.contain,
-                ),
-                const SizedBox(height: 24),
-                Text(
-                  resultText,
-                  style: TextStyle(
-                    fontSize: 28,
-                    fontWeight: FontWeight.bold,
-                    color: resultColor,
+    return Scaffold(
+      body: Stack(
+        children: [
+          SafeArea(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Image.asset(
+                    imageAsset,
+                    width: 200,
+                    height: 200,
+                    fit: BoxFit.contain,
                   ),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  'Вы набрали ${widget.score} из ${widget.totalQuestions * 10} баллов',
-                  style: const TextStyle(
-                    fontSize: 20,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Категория: ${widget.category}',
-                  style: const TextStyle(
-                    fontSize: 16,
-                    color: Colors.grey,
-                  ),
-                ),
-                const SizedBox(height: 24),
-                CircularPercentIndicator(
-                  radius: 80,
-                  lineWidth: 12,
-                  percent: percentage / 100,
-                  center: Text(
-                    '${percentage.toStringAsFixed(1)}%',
-                    style: const TextStyle(
-                      fontSize: 24,
+                  const SizedBox(height: 24),
+                  Text(
+                    resultText,
+                    style: TextStyle(
+                      fontSize: 28,
                       fontWeight: FontWeight.bold,
+                      color: resultColor,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Вы набрали ${widget.score} из ${widget.totalQuestions * 10} баллов',
+                    style: const TextStyle(
+                      fontSize: 20,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Категория: ${widget.category}',
+                    style: const TextStyle(
+                      fontSize: 16,
+                      color: Colors.grey,
                     ),
                   ),
-                  progressColor: Theme.of(context).colorScheme.primary,
-                  backgroundColor: Colors.grey,
-                  circularStrokeCap: CircularStrokeCap.round,
-                  animation: true,
-                  animationDuration: 1500,
-                ),
-                const SizedBox(height: 40),
-                if (_isAchievementUnlocked)
-                  Card(
-                    color: Colors.amber[100],
-                    child: const Padding(
-                      padding: EdgeInsets.all(16),
-                      child: Row(
-                        children: [
-                          Icon(Icons.star, color: Colors.amber),
-                          SizedBox(width: 8),
-                          Text('Новое достижение разблокировано!'),
-                        ],
+                  const SizedBox(height: 24),
+                  CircularPercentIndicator(
+                    radius: 80,
+                    lineWidth: 12,
+                    percent: percentage / 100,
+                    center: Text(
+                      '${percentage.toStringAsFixed(1)}%',
+                      style: const TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
                       ),
                     ),
+                    progressColor: Theme.of(context).colorScheme.primary,
+                    backgroundColor: Colors.grey,
+                    circularStrokeCap: CircularStrokeCap.round,
+                    animation: true,
+                    animationDuration: 1500,
                   ),
-                const SizedBox(height: 20),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    ElevatedButton(
-                      onPressed: () {
-                        Navigator.pushAndRemoveUntil(
-                          context,
-                          MaterialPageRoute(builder: (context) => const HomeScreen()),
-                          (route) => false,
-                        );
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Theme.of(context).colorScheme.primary,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
+                  const SizedBox(height: 40),
+                  if (_isAchievementUnlocked)
+                    Card(
+                      color: Colors.amber[100],
+                      child: const Padding(
+                        padding: EdgeInsets.all(16),
+                        child: Row(
+                          children: [
+                            Icon(Icons.star, color: Colors.amber),
+                            SizedBox(width: 8),
+                            Text('Новое достижение разблокировано!'),
+                          ],
                         ),
                       ),
-                      child: const Text('Главная'),
                     ),
-                    const SizedBox(width: 16),
-                    ElevatedButton(
-                      onPressed: () {
-                        Navigator.pushReplacement(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => const QuizSetupScreen(),
+                  const SizedBox(height: 20),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      ElevatedButton(
+                        onPressed: () {
+                          Navigator.pushAndRemoveUntil(
+                            context,
+                            MaterialPageRoute(builder: (context) => const HomeScreen()),
+                            (route) => false,
+                          );
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Theme.of(context).colorScheme.primary,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
                           ),
-                        );
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Theme.of(context).colorScheme.secondary,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
                         ),
+                        child: const Text('Главная'),
                       ),
-                      child: const Text('Ещё раз'),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-                OutlinedButton(
-                  onPressed: () {
-                    Share.share(
-                      'Я набрал ${widget.score} из ${widget.totalQuestions * 10} баллов в викторине по категории "${widget.category}"! Попробуй и ты!',
-                    );
-                  },
-                  style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    side: BorderSide(
-                      color: Theme.of(context).colorScheme.primary,
-                    ),
+                      const SizedBox(width: 16),
+                      ElevatedButton(
+                        onPressed: () {
+                          Navigator.pushReplacement(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const QuizSetupScreen(),
+                            ),
+                          );
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Theme.of(context).colorScheme.secondary,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        child: const Text('Ещё раз'),
+                      ),
+                    ],
                   ),
-                  child: const Text('Поделиться результатом'),
-                ),
-                const SizedBox(height: 16),
-                TextButton(
-                  onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => StatsScreen(),
+                  const SizedBox(height: 16),
+                  OutlinedButton(
+                    onPressed: () {
+                      Share.share(
+                        'Я набрал ${widget.score} из ${widget.totalQuestions * 10} баллов в викторине по категории "${widget.category}"! Попробуй и ты!',
+                      );
+                    },
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
                       ),
-                    );
-                  },
-                  child: const Text('Посмотреть статистику'),
-                ),
+                      side: BorderSide(
+                        color: Theme.of(context).colorScheme.primary,
+                      ),
+                    ),
+                    child: const Text('Поделиться результатом'),
+                  ),
+                  const SizedBox(height: 16),
+                  TextButton(
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => StatsScreen(),
+                        ),
+                      );
+                    },
+                    child: const Text('Посмотреть статистику'),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          Align(
+            alignment: Alignment.topCenter,
+            child: ConfettiWidget(
+              confettiController: _confettiController,
+              blastDirectionality: BlastDirectionality.explosive,
+              shouldLoop: false,
+              colors: const [
+                Colors.green,
+                Colors.blue,
+                Colors.pink,
+                Colors.orange,
+                Colors.purple,
               ],
             ),
           ),
-        ),
-        Align(
-          alignment: Alignment.topCenter,
-          child: ConfettiWidget(
-            confettiController: _confettiController,
-            blastDirectionality: BlastDirectionality.explosive,
-            shouldLoop: false,
-            colors: const [
-              Colors.green,
-              Colors.blue,
-              Colors.pink,
-              Colors.orange,
-              Colors.purple,
-            ],
-          ),
-        ),
-      ],
-    ),
-  );
-}
+        ],
+      ),
+    );
+  }
 }
 
 class LearningModeScreen extends StatefulWidget {
@@ -1908,81 +1921,80 @@ class _StatsScreenState extends State<StatsScreen> {
     statsBox = Hive.box('statsBox');
   }
 
-@override
-Widget build(BuildContext context) {
-  final totalGames = statsBox.get('totalGames', defaultValue: 0) as int;
-  final totalCorrect = statsBox.get('totalCorrect', defaultValue: 0) as int;
-  final totalQuestions = totalGames * 10;
-  final totalPoints = statsBox.get('totalPoints', defaultValue: 0) as int;
-  
-  // Получаем историю игр и безопасно приводим к нужному типу
-final gameHistory = (statsBox.get('gameHistory', defaultValue: <Map<String, dynamic>>[]) as List)
-    .map((item) => Map<String, dynamic>.from(item as Map))
-    .toList();
+  @override
+  Widget build(BuildContext context) {
+    final totalGames = statsBox.get('totalGames', defaultValue: 0) as int;
+    final totalCorrect = statsBox.get('totalCorrect', defaultValue: 0) as int;
+    final totalQuestions = totalGames * 10;
+    final totalPoints = statsBox.get('totalPoints', defaultValue: 0) as int;
+    
+    final gameHistory = (statsBox.get('gameHistory', defaultValue: <Map<String, dynamic>>[]) as List)
+        .map((item) => Map<String, dynamic>.from(item as Map))
+        .toList();
 
-  return Scaffold(
-    appBar: AppBar(
-      title: const Text('Моя статистика'),
-    ),
-    body: SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Общая статистика',
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          const SizedBox(height: 16),
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceAround,
-                children: [
-                  _buildStatItem(
-                    value: totalGames.toString(),
-                    label: 'Игр',
-                  ),
-                  _buildStatItem(
-                    value: '$totalCorrect/$totalQuestions',
-                    label: 'Правильных ответов',
-                  ),
-                  _buildStatItem(
-                    value: totalPoints.toString(),
-                    label: 'Очков',
-                  ),
-                ],
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Моя статистика'),
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Общая статистика',
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
               ),
             ),
-          ),
-          const SizedBox(height: 24),
-          const Text(
-            'История игр',
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
+            const SizedBox(height: 16),
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceAround,
+                  children: [
+                    _buildStatItem(
+                      value: totalGames.toString(),
+                      label: 'Игр',
+                    ),
+                    _buildStatItem(
+                      value: '$totalCorrect/$totalQuestions',
+                      label: 'Правильных ответов',
+                    ),
+                    _buildStatItem(
+                      value: totalPoints.toString(),
+                      label: 'Очков',
+                    ),
+                  ],
+                ),
+              ),
             ),
-          ),
-          const SizedBox(height: 8),
-          if (gameHistory.isEmpty)
-            const Center(
-              child: Text('Нет данных об играх'),
-            )
-          else
-            Column(
-              children: gameHistory.reversed.map((game) {
-                return _buildGameHistoryCard(game);
-              }).toList(),
+            const SizedBox(height: 24),
+            const Text(
+              'История игр',
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+              ),
             ),
-        ],
+            const SizedBox(height: 8),
+            if (gameHistory.isEmpty)
+              const Center(
+                child: Text('Нет данных об играх'),
+              )
+            else
+              Column(
+                children: gameHistory.reversed.map((game) {
+                  return _buildGameHistoryCard(game);
+                }).toList(),
+              ),
+          ],
+        ),
       ),
-    ),
-  );
-}
+    );
+  }
 
   Widget _buildStatItem({required String value, required String label}) {
     return Column(
