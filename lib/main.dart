@@ -110,7 +110,6 @@ class QuizRepository {
         
         for (var question in questions) {
           await question.fetchWikipediaInfo();
-          await question.fetchImage();
           await question.generateHints();
         }
         
@@ -358,24 +357,41 @@ class QuizQuestion {
 
   Future<void> translate(String targetLang) async {
     try {
-      // Перевод вопроса
-      final questionResponse = await http.get(
-        Uri.parse('https://api.mymemory.translated.net/get?q=${Uri.encodeComponent(question)}&langpair=en|$targetLang'),
+      // Используем LibreTranslate API (можно заменить на свой сервер)
+      const libreTranslateUrl = 'https://libretranslate.de/translate';
+      
+      // Переводим вопрос
+      final questionResponse = await http.post(
+        Uri.parse(libreTranslateUrl),
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({
+          'q': question,
+          'source': 'en',
+          'target': targetLang,
+        }),
       );
+      
       if (questionResponse.statusCode == 200) {
         final questionData = json.decode(questionResponse.body) as Map<String, dynamic>;
-        translatedQuestion = questionData['responseData']['translatedText'] as String? ?? question;
+        translatedQuestion = questionData['translatedText'] as String? ?? question;
       }
 
-      // Перевод вариантов ответов
+      // Переводим варианты ответов
       translatedOptions = [];
       for (var option in options) {
-        final optionResponse = await http.get(
-          Uri.parse('https://api.mymemory.translated.net/get?q=${Uri.encodeComponent(option)}&langpair=en|$targetLang'),
+        final optionResponse = await http.post(
+          Uri.parse(libreTranslateUrl),
+          headers: {'Content-Type': 'application/json'},
+          body: json.encode({
+            'q': option,
+            'source': 'en',
+            'target': targetLang,
+          }),
         );
+        
         if (optionResponse.statusCode == 200) {
           final optionData = json.decode(optionResponse.body) as Map<String, dynamic>;
-          translatedOptions.add(optionData['responseData']['translatedText'] as String? ?? option);
+          translatedOptions.add(optionData['translatedText'] as String? ?? option);
         } else {
           translatedOptions.add(option);
         }
@@ -416,22 +432,6 @@ class QuizQuestion {
       }
     } catch (e) {
       debugPrint('Wikipedia error: $e');
-    }
-  }
-
-  Future<void> fetchImage() async {
-    try {
-      final response = await http.get(
-        Uri.parse('https://pixabay.com/api/?key=YOUR_PIXABAY_API_KEY&q=${Uri.encodeComponent(category)}&image_type=photo&per_page=3'),
-      );
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body) as Map<String, dynamic>;
-        if (data['hits'] != null && (data['hits'] as List).isNotEmpty) {
-          imageUrl = (data['hits'] as List<dynamic>)[0]['webformatURL'] as String?;
-        }
-      }
-    } catch (e) {
-      debugPrint('Image fetch error: $e');
     }
   }
 
