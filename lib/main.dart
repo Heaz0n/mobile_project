@@ -22,6 +22,7 @@ void main() async {
   await Hive.openBox('achievementsBox');
   await Hive.openBox('statsBox');
   await Hive.openBox('settingsBox');
+  await Hive.openBox('translations');
   SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp])
       .then((_) {
     runApp(
@@ -74,11 +75,10 @@ class QuizRepository {
     final box = await Hive.openBox('quizBox');
     final cacheKey = '${category}_${difficulty}_$amount';
     
-   if (box.containsKey(cacheKey)) {
+if (box.containsKey(cacheKey)) {
   final cachedData = box.get(cacheKey);
   final now = DateTime.now();
   final cachedTime = box.get('${cacheKey}_time');
-  
   if (cachedTime != null && now.difference(cachedTime as DateTime).inDays < 1) {
     final List<dynamic> dataList = cachedData is List ? cachedData : [];
     return dataList.map((item) {
@@ -130,44 +130,42 @@ class QuizRepository {
     }
   }
 
-Future<void> saveGameResult({
-  required int score,
-  required int totalQuestions,
-  required String category,
-  required String difficulty,
-}) async {
-  final box = await Hive.openBox('statsBox');
-  final now = DateTime.now();
-  final gameId = now.millisecondsSinceEpoch.toString();
-  
-  final gameData = <String, dynamic>{
-    'id': gameId,
-    'date': now.toIso8601String(),
-    'score': score,
-    'total': totalQuestions,
-    'category': category,
-    'difficulty': difficulty,
-    'percentage': (score / (totalQuestions * 10)) * 100,
-  };
-  
-  // Получаем историю игр и приводим к правильному типу
-  final history = List<Map<String, dynamic>>.from(
-    box.get('gameHistory', defaultValue: <Map<String, dynamic>>[]) as List
-  );
-  history.add(gameData);
-  await box.put('gameHistory', history);
-  
-  // Обновляем общую статистику
-  final totalGames = box.get('totalGames', defaultValue: 0) as int;
-  final totalCorrect = box.get('totalCorrect', defaultValue: 0) as int;
-  final totalPoints = box.get('totalPoints', defaultValue: 0) as int;
-  
-  await box.put('totalGames', totalGames + 1);
-  await box.put('totalCorrect', totalCorrect + score ~/ 10);
-  await box.put('totalPoints', totalPoints + score);
-  
-  await _checkAchievements(box, score, totalQuestions, category);
-}
+  Future<void> saveGameResult({
+    required int score,
+    required int totalQuestions,
+    required String category,
+    required String difficulty,
+  }) async {
+    final box = await Hive.openBox('statsBox');
+    final now = DateTime.now();
+    final gameId = now.millisecondsSinceEpoch.toString();
+    
+    final gameData = <String, dynamic>{
+      'id': gameId,
+      'date': now.toIso8601String(),
+      'score': score,
+      'total': totalQuestions,
+      'category': category,
+      'difficulty': difficulty,
+      'percentage': (score / (totalQuestions * 10)) * 100,
+    };
+    
+    final history = List<Map<String, dynamic>>.from(
+      box.get('gameHistory', defaultValue: <Map<String, dynamic>>[]) as List
+    );
+    history.add(gameData);
+    await box.put('gameHistory', history);
+    
+    final totalGames = box.get('totalGames', defaultValue: 0) as int;
+    final totalCorrect = box.get('totalCorrect', defaultValue: 0) as int;
+    final totalPoints = box.get('totalPoints', defaultValue: 0) as int;
+    
+    await box.put('totalGames', totalGames + 1);
+    await box.put('totalCorrect', totalCorrect + score ~/ 10);
+    await box.put('totalPoints', totalPoints + score);
+    
+    await _checkAchievements(box, score, totalQuestions, category);
+  }
 
   Future<void> _checkAchievements(Box box, int score, int totalQuestions, String category) async {
     final achievementsBox = await Hive.openBox('achievementsBox');
@@ -358,36 +356,36 @@ class QuizQuestion {
     );
   }
 
-  Future<void> translate(String targetLang) async {
-    try {
-      final questionResponse = await http.get(
-        Uri.parse('https://api.mymemory.translated.net/get?q=${Uri.encodeComponent(question)}&langpair=en|$targetLang'),
-      );
-
-      if (questionResponse.statusCode == 200) {
-        final questionData = json.decode(questionResponse.body) as Map<String, dynamic>;
-        translatedQuestion = questionData['responseData']['translatedText'] as String? ?? question;
-      }
-
-      translatedOptions = [];
-      for (var option in options) {
-        final optionResponse = await http.get(
-          Uri.parse('https://api.mymemory.translated.net/get?q=${Uri.encodeComponent(option)}&langpair=en|$targetLang'),
-        );
-
-        if (optionResponse.statusCode == 200) {
-          final optionData = json.decode(optionResponse.body) as Map<String, dynamic>;
-          translatedOptions.add(optionData['responseData']['translatedText'] as String? ?? option);
-        } else {
-          translatedOptions.add(option);
-        }
-      }
-    } catch (e) {
-      debugPrint('Translation error: $e');
-      translatedQuestion = question;
-      translatedOptions = options;
+Future<void> translate(String targetLang) async {
+  try {
+    // Перевод вопроса
+    final questionResponse = await http.get(
+      Uri.parse('https://api.mymemory.translated.net/get?q=${Uri.encodeComponent(question)}&langpair=en|$targetLang'),
+    );
+    if (questionResponse.statusCode == 200) {
+      final questionData = json.decode(questionResponse.body) as Map<String, dynamic>;
+      translatedQuestion = questionData['responseData']['translatedText'] as String? ?? question;
     }
+
+    // Перевод вариантов ответов
+    translatedOptions = [];
+    for (var option in options) {
+      final optionResponse = await http.get(
+        Uri.parse('https://api.mymemory.translated.net/get?q=${Uri.encodeComponent(option)}&langpair=en|$targetLang'),
+      );
+      if (optionResponse.statusCode == 200) {
+        final optionData = json.decode(optionResponse.body) as Map<String, dynamic>;
+        translatedOptions.add(optionData['responseData']['translatedText'] as String? ?? option);
+      } else {
+        translatedOptions.add(option);
+      }
+    }
+  } catch (e) {
+    debugPrint('Translation error: $e');
+    translatedQuestion = question;
+    translatedOptions = options;
   }
+}
 
   Future<void> fetchWikipediaInfo() async {
     try {
@@ -420,32 +418,28 @@ class QuizQuestion {
       debugPrint('Wikipedia error: $e');
     }
   }
-
-  Future<void> fetchImage() async {
-    try {
-      final response = await http.get(
-        Uri.parse('https://pixabay.com/api/?key=17555168-4a24b1a4e5c3b1ccf9a2d0b3d&q=${Uri.encodeComponent(category)}&image_type=photo&per_page=3'),
-      );
-
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body) as Map<String, dynamic>;
-        if (data['hits'] != null && (data['hits'] as List).isNotEmpty) {
-          imageUrl = (data['hits'] as List<dynamic>)[0]['webformatURL'] as String?;
-        }
+Future<void> fetchImage() async {
+  try {
+    final response = await http.get(
+      Uri.parse('https://pixabay.com/api/?key=YOUR_PIXABAY_API_KEY&q=${Uri.encodeComponent(category)}&image_type=photo&per_page=3'),
+    );
+    if (response.statusCode == 200) {
+      final data = json.decode(response.body) as Map<String, dynamic>;
+      if (data['hits'] != null && (data['hits'] as List).isNotEmpty) {
+        imageUrl = (data['hits'] as List<dynamic>)[0]['webformatURL'] as String?;
       }
-    } catch (e) {
-      debugPrint('Image fetch error: $e');
     }
+  } catch (e) {
+    debugPrint('Image fetch error: $e');
   }
-
-  Future<void> generateHints() async {
-  hints = [];
-  
-  final correctAnswer = options[correctIndex];
-  hints?.add('Первая буква: ${correctAnswer[0].toUpperCase()}');
-  hints?.add('Категория: $category');
-  hints?.add('Длина ответа: ${correctAnswer.length} букв');
 }
+  Future<void> generateHints() async {
+    hints = [];
+    final correctAnswer = options[correctIndex];
+    hints?.add('Первая буква: ${correctAnswer[0].toUpperCase()}');
+    hints?.add('Категория: $category');
+    hints?.add('Длина ответа: ${correctAnswer.length} букв');
+  }
 }
 
 class HomeScreen extends StatefulWidget {
@@ -526,7 +520,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                             _buildFeatureCard(
                               icon: Icons.language,
                               title: 'Мультиязычность',
-                              description: 'Поддержка 6 языков с автоматическим переводом',
+                              description: 'Поддержка русского и английского языков',
                             ),
                             _buildFeatureCard(
                               icon: Icons.offline_bolt,
@@ -861,10 +855,7 @@ class _QuizSetupScreenState extends State<QuizSetupScreen> {
                     
                     await audioPlayer.play(AssetSource('sounds/start.mp3'));
                     for (var question in questions) {
-                      if (selectedLanguage != 'Английский') {
-                        await question.translate(
-                            quizRepo.languages[selectedLanguage]!);
-                      }
+                      await question.translate(quizRepo.languages[selectedLanguage]!);
                     }
                     
                     if (mounted) {
@@ -1460,198 +1451,199 @@ class _ResultsScreenState extends State<ResultsScreen> {
     }
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final percentage = (widget.score / (widget.totalQuestions * 10)) * 100;
-    String resultText;
-    String animationAsset;
-    Color resultColor;
+@override
+Widget build(BuildContext context) {
+  final percentage = (widget.score / (widget.totalQuestions * 10)) * 100;
+  String resultText;
+  String imageAsset; // Заменяем JSON на путь к JPG
+  Color resultColor;
 
-    if (percentage >= 80) {
-      resultText = 'Превосходно! 🎉';
-      animationAsset = 'assets/animations/success.json';
-      resultColor = Colors.green;
-    } else if (percentage >= 50) {
-      resultText = 'Хороший результат! 👍';
-      animationAsset = 'assets/animations/good.json';
-      resultColor = Colors.orange;
-    } else {
-      resultText = 'Попробуйте ещё раз! 💪';
-      animationAsset = 'assets/animations/try_again.json';
-      resultColor = Colors.red;
-    }
+  if (percentage >= 80) {
+    resultText = 'Превосходно! 🎉';
+    imageAsset = 'assets/images/success.jpg'; // Укажите путь к JPG
+    resultColor = Colors.green;
+  } else if (percentage >= 50) {
+    resultText = 'Хороший результат! 👍';
+    imageAsset = 'assets/images/good.jpg'; // Укажите путь к JPG
+    resultColor = Colors.orange;
+  } else {
+    resultText = 'Попробуйте ещё раз! 💪';
+    imageAsset = 'assets/images/try_again.jpg'; // Укажите путь к JPG
+    resultColor = Colors.red;
+  }
 
-    return Scaffold(
-      body: Stack(
-        children: [
-          SafeArea(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(24),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Lottie.asset(
-                    animationAsset,
-                    width: 200,
-                    height: 200,
-                    fit: BoxFit.contain,
+  return Scaffold(
+    body: Stack(
+      children: [
+        SafeArea(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                // Заменяем Lottie.asset на Image.asset
+                Image.asset(
+                  imageAsset,
+                  width: 200,
+                  height: 200,
+                  fit: BoxFit.contain,
+                ),
+                const SizedBox(height: 24),
+                Text(
+                  resultText,
+                  style: TextStyle(
+                    fontSize: 28,
+                    fontWeight: FontWeight.bold,
+                    color: resultColor,
                   ),
-                  const SizedBox(height: 24),
-                  Text(
-                    resultText,
-                    style: TextStyle(
-                      fontSize: 28,
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  'Вы набрали ${widget.score} из ${widget.totalQuestions * 10} баллов',
+                  style: const TextStyle(
+                    fontSize: 20,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Категория: ${widget.category}',
+                  style: const TextStyle(
+                    fontSize: 16,
+                    color: Colors.grey,
+                  ),
+                ),
+                const SizedBox(height: 24),
+                CircularPercentIndicator(
+                  radius: 80,
+                  lineWidth: 12,
+                  percent: percentage / 100,
+                  center: Text(
+                    '${percentage.toStringAsFixed(1)}%',
+                    style: const TextStyle(
+                      fontSize: 24,
                       fontWeight: FontWeight.bold,
-                      color: resultColor,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    'Вы набрали ${widget.score} из ${widget.totalQuestions * 10} баллов',
-                    style: const TextStyle(
-                      fontSize: 20,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Категория: ${widget.category}',
-                    style: const TextStyle(
-                      fontSize: 16,
-                      color: Colors.grey,
                     ),
                   ),
-                  const SizedBox(height: 24),
-                  CircularPercentIndicator(
-                    radius: 80,
-                    lineWidth: 12,
-                    percent: percentage / 100,
-                    center: Text(
-                      '${percentage.toStringAsFixed(1)}%',
-                      style: const TextStyle(
-                        fontSize: 24,
-                        fontWeight: FontWeight.bold,
+                  progressColor: Theme.of(context).colorScheme.primary,
+                  backgroundColor: Colors.grey,
+                  circularStrokeCap: CircularStrokeCap.round,
+                  animation: true,
+                  animationDuration: 1500,
+                ),
+                const SizedBox(height: 40),
+                if (_isAchievementUnlocked)
+                  Card(
+                    color: Colors.amber[100],
+                    child: const Padding(
+                      padding: EdgeInsets.all(16),
+                      child: Row(
+                        children: [
+                          Icon(Icons.star, color: Colors.amber),
+                          SizedBox(width: 8),
+                          Text('Новое достижение разблокировано!'),
+                        ],
                       ),
                     ),
-                    progressColor: Theme.of(context).colorScheme.primary,
-                    backgroundColor: Colors.grey,
-                    circularStrokeCap: CircularStrokeCap.round,
-                    animation: true,
-                    animationDuration: 1500,
                   ),
-                  const SizedBox(height: 40),
-                  if (_isAchievementUnlocked)
-                    Card(
-                      color: Colors.amber[100],
-                      child: const Padding(
-                        padding: EdgeInsets.all(16),
-                        child: Row(
-                          children: [
-                            Icon(Icons.star, color: Colors.amber),
-                            SizedBox(width: 8),
-                            Text('Новое достижение разблокировано!'),
-                          ],
+                const SizedBox(height: 20),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    ElevatedButton(
+                      onPressed: () {
+                        Navigator.pushAndRemoveUntil(
+                          context,
+                          MaterialPageRoute(builder: (context) => const HomeScreen()),
+                          (route) => false,
+                        );
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Theme.of(context).colorScheme.primary,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
                         ),
                       ),
+                      child: const Text('Главная'),
                     ),
-                  const SizedBox(height: 20),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      ElevatedButton(
-                        onPressed: () {
-                          Navigator.pushAndRemoveUntil(
-                            context,
-                            MaterialPageRoute(builder: (context) => const HomeScreen()),
-                            (route) => false,
-                          );
-                        },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Theme.of(context).colorScheme.primary,
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
+                    const SizedBox(width: 16),
+                    ElevatedButton(
+                      onPressed: () {
+                        Navigator.pushReplacement(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const QuizSetupScreen(),
                           ),
+                        );
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Theme.of(context).colorScheme.secondary,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
                         ),
-                        child: const Text('Главная'),
                       ),
-                      const SizedBox(width: 16),
-                      ElevatedButton(
-                        onPressed: () {
-                          Navigator.pushReplacement(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => const QuizSetupScreen(),
-                            ),
-                          );
-                        },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Theme.of(context).colorScheme.secondary,
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                        child: const Text('Ещё раз'),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  OutlinedButton(
-                    onPressed: () {
-                      Share.share(
-                        'Я набрал ${widget.score} из ${widget.totalQuestions * 10} баллов в викторине по категории "${widget.category}"! Попробуй и ты!',
-                      );
-                    },
-                    style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      side: BorderSide(
-                        color: Theme.of(context).colorScheme.primary,
-                      ),
+                      child: const Text('Ещё раз'),
                     ),
-                    child: const Text('Поделиться результатом'),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                OutlinedButton(
+                  onPressed: () {
+                    Share.share(
+                      'Я набрал ${widget.score} из ${widget.totalQuestions * 10} баллов в викторине по категории "${widget.category}"! Попробуй и ты!',
+                    );
+                  },
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    side: BorderSide(
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
                   ),
-                  const SizedBox(height: 16),
-                  TextButton(
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => StatsScreen(),
-                        ),
-                      );
-                    },
-                    child: const Text('Посмотреть статистику'),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          Align(
-            alignment: Alignment.topCenter,
-            child: ConfettiWidget(
-              confettiController: _confettiController,
-              blastDirectionality: BlastDirectionality.explosive,
-              shouldLoop: false,
-              colors: const [
-                Colors.green,
-                Colors.blue,
-                Colors.pink,
-                Colors.orange,
-                Colors.purple,
+                  child: const Text('Поделиться результатом'),
+                ),
+                const SizedBox(height: 16),
+                TextButton(
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => StatsScreen(),
+                      ),
+                    );
+                  },
+                  child: const Text('Посмотреть статистику'),
+                ),
               ],
             ),
           ),
-        ],
-      ),
-    );
-  }
+        ),
+        Align(
+          alignment: Alignment.topCenter,
+          child: ConfettiWidget(
+            confettiController: _confettiController,
+            blastDirectionality: BlastDirectionality.explosive,
+            shouldLoop: false,
+            colors: const [
+              Colors.green,
+              Colors.blue,
+              Colors.pink,
+              Colors.orange,
+              Colors.purple,
+            ],
+          ),
+        ),
+      ],
+    ),
+  );
+}
 }
 
 class LearningModeScreen extends StatefulWidget {
