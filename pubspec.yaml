@@ -44,6 +44,6 @@ flutter:
   uses-material-design: true # Использование Material Design иконок
   assets:
     - assets/sounds/ # Папка для звуковых файлов
-    - assets/animations/success.jpg
-    - assets/animations/good.jpg
-    - assets/animations/try_again.jpg
+    - assets/images/success.jpg
+    - assets/images/good.jpg
+    - assets/images/try_again.jpg
